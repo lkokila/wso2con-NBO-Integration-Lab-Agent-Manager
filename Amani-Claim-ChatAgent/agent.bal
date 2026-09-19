@@ -16,7 +16,15 @@
 import ballerina/ai;
 import ballerina/http;
 
+// Enables the WSO2 Agent Manager (AMP) tracing extension. Import only - the
+// platform's auto-instrumentation does nothing for a Ballerina program without it.
+import ballerinax/amp as _;
+
 configurable string claimsToolsMcpServerUrl = "http://localhost:9091/mcp";
+
+// Agent Manager's chat-api contract is POST /chat on port 8000. Configurable so
+// the package still runs locally on another port.
+configurable int servicePort = 8000;
 
 final ai:Wso2ModelProvider claimChatAgentModel = check ai:getDefaultModelProvider();
 
@@ -38,9 +46,11 @@ Always tell the employee plainly what you found, what you did, and why, citing t
     tools = [claimChatAgentMcpToolkit]
 );
 
-listener ai:Listener claimChatAgentListener = new (listenOn = check http:getDefaultListener());
+listener ai:Listener claimChatAgentListener = new (listenOn = servicePort);
 
-service /amani\-claim\-chat\-agent on claimChatAgentListener {
+// Mounted at the root so the resource below answers on POST /chat, which is the
+// path Agent Manager's chat-api contract requires.
+service / on claimChatAgentListener {
 
     resource function post chat(@http:Payload ai:ChatReqMessage request) returns ai:ChatRespMessage|error {
         string stringResult = check claimChatAgent.run(request.message, request.sessionId);

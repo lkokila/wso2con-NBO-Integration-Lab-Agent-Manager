@@ -18,7 +18,7 @@ Three packages, in dependency order:
 |---|---|---|
 | `claimapi` | Claims backend. In-memory store, seeded at startup — no database required. | `8080`, serving both `/claims` and `/customers` |
 | `claimtools` | MCP toolset (Streamable HTTP). Seven tools carrying the business rules — coverage checks, authority limits, document guardrails. Calls `claimapi` only. | `9091` `/mcp` |
-| `Amani-Claim-ChatAgent` | The agent itself. An `ai:Agent` with an inline system prompt and an `ai:McpToolKit`; `claimtools` is its only source of claim data. | chat-api fixed port, `/amani-claim-chat-agent/chat` |
+| `Amani-Claim-ChatAgent` | The agent itself. An `ai:Agent` with an inline system prompt and an `ai:McpToolKit`; `claimtools` is its only source of claim data. | `8000` `POST /chat` |
 
 The chat agent never calls `claimapi` directly, and `claimtools` holds no state of its own, so the
 three deploy and scale independently.
@@ -45,8 +45,12 @@ the seven tools are not URL paths and cannot be expressed in OpenAPI. Read the t
 
 The chat agent needs an attached LLM provider.
 
-Build type is `buildpack` with language `ballerina` — which needs no `languageVersion` or
-`runCommand`. All three packages target Ballerina Swan Lake `2201.13.5`.
+Build type is **Ballerina**, which needs no start command or language version. All three packages
+target Ballerina Swan Lake `2201.13.5`.
+
+All three also carry `import ballerinax/amp as _;`. The console's "Enable auto instrumentation"
+checkbox does nothing for a Ballerina program without it, so removing the import silently costs
+you every trace.
 
 ## Configuration
 
@@ -61,6 +65,7 @@ credentials. Every value below is supplied at deploy time instead.
 | `claimtools` | `servicePort` | `9091` | Leave as-is unless the component port changes |
 | `claimapi` | `servicePort` | `8080` | Leave as-is |
 | `Amani-Claim-ChatAgent` | `claimsToolsMcpServerUrl` | `http://localhost:9091/mcp` | Deployed `claimtools` URL, **including `/mcp`** |
+| `Amani-Claim-ChatAgent` | `servicePort` | `8000` | Leave as-is — Agent Manager's chat-api contract |
 | `Amani-Claim-ChatAgent` | `ballerina.ai.wso2ProviderConfig` | — | Attach an LLM provider in Agent Manager |
 
 For a Ballerina configurable in a qualified module, the most predictable injection route is a
@@ -78,7 +83,7 @@ customersBackendUrl = "https://<claimapi-host>"
 ```bash
 cd claimapi              && bal run     # 8080 (/claims + /customers)
 cd claimtools            && bal run     # 9091
-cd Amani-Claim-ChatAgent && bal run     # needs Config.toml with provider credentials
+cd Amani-Claim-ChatAgent && bal run     # 8000, needs Config.toml with provider credentials
 ```
 
 `Amani-Claim-ChatAgent/Config.toml` is gitignored; create it locally with:
@@ -95,7 +100,7 @@ run **"Ballerina: Configure Default Model Provider"** from the Command Palette.
 Then:
 
 ```bash
-curl -X POST http://localhost:9090/amani-claim-chat-agent/chat \
+curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What is the status of claim CLM-1042?", "sessionId": "demo-1"}'
 ```
@@ -125,10 +130,25 @@ claimant through it. That failure is a transport error, which `ballerina/mcp` co
 `Tool 'getClaimAssessment' failed unexpectedly.`, so the model would be told nothing it could act
 on. Keep both services on the one listener.
 
+**The chat request payload does not match the console's stated contract.** The create form
+describes chat-api as `POST /chat` on port `8000` with request `{message, session_id, context}`
+and response `{response}`. Path and port now match. The field names do not, and cannot be changed
+from here: `ai:ChatService` mandates the resource signature
+`post chat(@http:Payload ChatReqMessage) returns ChatRespMessage|error`, and both records are
+closed — `ai:ChatReqMessage` is `{sessionId, message}`, `ai:ChatRespMessage` is `{message}`.
+Verified locally: `sessionId` returns 201, `session_id` returns 400 `undefined field 'session_id'`.
+Matching the documented shape would mean dropping `ai:Listener` for a plain `http:Listener` with
+hand-rolled records, keeping `ai:Agent`. Confirm what the platform actually sends before doing
+that — the info box may describe the Python contract.
+
+**Responses are HTTP 201, not 200.** Ballerina's default for a POST resource returning a value.
+Harmless if the platform accepts any 2xx.
+
 **State is per-replica and non-durable.** Everything lives in the `claimapi` process. A restart
 reseeds all three claims mid-demo, and more than one replica would serve inconsistent claims. Keep
 `claimapi` at a single replica.
 
-**Divergence from the demo repo.** `claimapi/main.bal` here differs from `wso2con-NBO-Demo`: the
-listener merge above, and the dropped `ai:TextDataLoader`. Port a fix to both, or treat this repo
+**Divergence from the demo repo.** This repo differs from `wso2con-NBO-Demo`: the listener merge
+above, the dropped `ai:TextDataLoader`, the `ballerinax/amp` imports, and the chat agent's port and
+root service path. Port a fix to both, or treat this repo
 as the source of truth for deployment.
