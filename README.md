@@ -16,7 +16,7 @@ Three packages, in dependency order:
 
 | Package | Role | Listens on |
 |---|---|---|
-| `claimapi` | Claims backend. In-memory store, seeded at startup — no database required. | `8080` `/claims`, `8081` `/customers` |
+| `claimapi` | Claims backend. In-memory store, seeded at startup — no database required. | `8080`, serving both `/claims` and `/customers` |
 | `claimtools` | MCP toolset (Streamable HTTP). Seven tools carrying the business rules — coverage checks, authority limits, document guardrails. Calls `claimapi` only. | `9091` `/mcp` |
 | `Amani-Claim-ChatAgent` | The agent itself. An `ai:Agent` with an inline system prompt and an `ai:McpToolKit`; `claimtools` is its only source of claim data. | chat-api fixed port, `/amani-claim-chat-agent/chat` |
 
@@ -29,11 +29,21 @@ Each package is a separate Agent Manager component built from this repo, disting
 `appPath`. Deploy bottom-up — `claimapi`, then `claimtools`, then the agent — since each needs the
 previous one's URL.
 
-| Component | `appPath` | Subtype | Notes |
-|---|---|---|---|
-| `claimapi` | `/claimapi` | `custom-api` | See "Two listeners" below |
-| `claimtools` | `/claimtools` | `custom-api` | Port `9091`, base path `/mcp` |
-| `Amani-Claim-ChatAgent` | `/Amani-Claim-ChatAgent` | `chat-api` | Needs an attached LLM provider |
+| Component | `appPath` | Subtype | Port | Base path | Schema |
+|---|---|---|---|---|---|
+| `claimapi` | `/claimapi` | `custom-api` | `8080` | `/` | `/claimapi/openapi.yaml` |
+| `claimtools` | `/claimtools` | `custom-api` | `9091` | `/mcp` | `/claimtools/openapi.yaml` |
+| `Amani-Claim-ChatAgent` | `/Amani-Claim-ChatAgent` | `chat-api` | fixed | — | — |
+
+Both `custom-api` components carry a committed OpenAPI document, since Agent Manager requires one.
+`claimapi/openapi.yaml` is generated from the service declarations (`bal build --export-openapi`,
+with the two per-service specs merged and re-rooted under `/claims` and `/customers`) — regenerate
+it after changing any resource signature. `claimtools/openapi.yaml` is necessarily a transport
+description, not a capability one: MCP multiplexes every tool over a single JSON-RPC endpoint, so
+the seven tools are not URL paths and cannot be expressed in OpenAPI. Read the tool list from
+`tools/list` over the protocol, never from that file.
+
+The chat agent needs an attached LLM provider.
 
 Build type is `buildpack` with language `ballerina` — which needs no `languageVersion` or
 `runCommand`. All three packages target Ballerina Swan Lake `2201.13.5`.
@@ -46,11 +56,10 @@ credentials. Every value below is supplied at deploy time instead.
 | Component | Configurable | Default | Set to |
 |---|---|---|---|
 | `claimtools` | `backendUrl` | `http://localhost:8080` | Deployed `claimapi` `/claims` URL |
-| `claimtools` | `customersBackendUrl` | `http://localhost:8081` | Deployed `claimapi` `/customers` URL |
+| `claimtools` | `customersBackendUrl` | same as `backendUrl` | Only if `/customers` is split onto its own host |
 | `claimtools` | `autoApprovalLimit` | `1000.00` | Payout ceiling before the agent must escalate |
 | `claimtools` | `servicePort` | `9091` | Leave as-is unless the component port changes |
 | `claimapi` | `servicePort` | `8080` | Leave as-is |
-| `claimapi` | `customersServicePort` | `8081` | Leave as-is |
 | `Amani-Claim-ChatAgent` | `claimsToolsMcpServerUrl` | `http://localhost:9091/mcp` | Deployed `claimtools` URL, **including `/mcp`** |
 | `Amani-Claim-ChatAgent` | `ballerina.ai.wso2ProviderConfig` | — | Attach an LLM provider in Agent Manager |
 
@@ -67,7 +76,7 @@ customersBackendUrl = "https://<claimapi-host>"
 ## Local run
 
 ```bash
-cd claimapi              && bal run     # 8080 + 8081
+cd claimapi              && bal run     # 8080 (/claims + /customers)
 cd claimtools            && bal run     # 9091
 cd Amani-Claim-ChatAgent && bal run     # needs Config.toml with provider credentials
 ```
@@ -108,17 +117,18 @@ still outstanding — it should refuse and hand back a remedy rather than guess.
 
 ## Known constraints
 
-**Two listeners, one port.** `claimapi` runs `/claims` on `8080` and `/customers` on `8081`, and
-`claimtools` calls both. An Agent Manager `inputInterface` exposes a single port, so this needs a
-decision: either merge both services onto one listener, or deploy `claimapi` twice. Note that
-deploying twice gives each copy its **own in-memory store**, so `/claims` and `/customers` would
-serve from different data.
+**One port, by design.** `/claims` and `/customers` are still two separate Ballerina services, but
+they share a single listener. Upstream in `wso2con-NBO-Demo` they sit on `8080` and `8081`; an
+Agent Manager component publishes exactly one port, so on two ports `/customers` would be
+unroutable — and `getClaimAssessment`, the first tool the agent calls for any claim, fetches the
+claimant through it. That failure is a transport error, which `ballerina/mcp` collapses to
+`Tool 'getClaimAssessment' failed unexpectedly.`, so the model would be told nothing it could act
+on. Keep both services on the one listener.
 
 **State is per-replica and non-durable.** Everything lives in the `claimapi` process. A restart
 reseeds all three claims mid-demo, and more than one replica would serve inconsistent claims. Keep
 `claimapi` at a single replica.
 
-**`custom-api` wants an OpenAPI schema.** The Agent Manager manifest marks `port`, `basePath` and
-`schema` as all required for `custom-api`. There is no spec in this repo, and for `claimtools` —
-MCP Streamable HTTP, not REST — there is no honest OpenAPI description to write. Expect to supply
-a minimal stub.
+**Divergence from the demo repo.** `claimapi/main.bal` here differs from `wso2con-NBO-Demo`: the
+listener merge above, and the dropped `ai:TextDataLoader`. Port a fix to both, or treat this repo
+as the source of truth for deployment.

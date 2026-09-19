@@ -1,22 +1,21 @@
 
-// Amani Insurance backend REST APIs (README.md sections 3 and 25).
+// Amani Insurance backend REST APIs.
 //
-// Two independent services on two listeners/ports within this package:
-//   /claims    on claimsListener (servicePort, default 8080) - claim lifecycle
-//   /customers on customersListener (customersServicePort, default 8081) -
-//              claimant/policyholder lookups
+// Two services sharing one listener/port:
+//   /claims    - claim lifecycle
+//   /customers - claimant/policyholder lookups
 //
-// Split so each can be demoed, scaled, and reasoned about as a distinct
-// backend even though they currently share one in-memory data store (db.bal).
+// They remain separate services, so each is still its own addressable API over
+// the shared in-memory data store (db.bal), but they are exposed on a single
+// port because a WSO2 Agent Manager component publishes exactly one. Splitting
+// them across two ports again would make /customers unroutable once deployed.
 
 import ballerina/http;
 import ballerina/log;
 
 configurable int servicePort = 8080;
-configurable int customersServicePort = 8081;
 
-listener http:Listener claimsListener = new (servicePort);
-listener http:Listener customersListener = new (customersServicePort);
+listener http:Listener backendListener = new (servicePort);
 
 @http:ServiceConfig {
     cors: {
@@ -24,7 +23,7 @@ listener http:Listener customersListener = new (customersServicePort);
         allowOrigins: ["*"]
     }
 }
-service /claims on claimsListener {
+service /claims on backendListener {
 
     resource function get .() returns Claim[]|http:InternalServerError {
         Claim[]|error claims = getAllClaims();
@@ -119,7 +118,13 @@ service /claims on claimsListener {
     }
 }
 
-service /customers on customersListener {
+@http:ServiceConfig {
+    cors: {
+        allowMethods: ["GET", "POST"],
+        allowOrigins: ["*"]
+    }
+}
+service /customers on backendListener {
 
     resource function get [string customerId]() returns Customer|http:NotFound|http:InternalServerError {
         Customer?|error customer = getCustomer(customerId);

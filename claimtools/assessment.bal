@@ -3,7 +3,10 @@
 import ballerina/http;
 
 configurable string backendUrl = "http://localhost:8080";
-configurable string customersBackendUrl = "http://localhost:8081";
+
+# Where /customers lives. It shares claimapi's single port by default; kept as its
+# own setting so the two APIs can still be split across hosts without a code change.
+configurable string customersBackendUrl = backendUrl;
 
 # The most this agent may approve on its own. Anything above it must be escalated
 # to a human adjuster - this is the agent's authority limit, not a system limit.
