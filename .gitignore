@@ -1,5 +1,4 @@
-# Repo-wide safety net. Each package also carries its own .gitignore; this
-# catches anything added later that forgets one.
+# Single Ballerina package at the repo root; this is the only .gitignore.
 
 # Build output
 target/
@@ -16,3 +15,10 @@ trace_enabled.bal
 # Local editor / OS state
 .vscode/
 .DS_Store
+
+# Empty stubs the Ballerina AI tooling generates on build
+agents.bal
+functions.bal
+automation.bal
+data_mappings.bal
+connections.bal

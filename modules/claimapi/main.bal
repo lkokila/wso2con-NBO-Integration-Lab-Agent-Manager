@@ -13,10 +13,6 @@
 import ballerina/http;
 import ballerina/log;
 
-// Enables the WSO2 Agent Manager (AMP) tracing extension. Import only - the
-// platform's auto-instrumentation does nothing for a Ballerina program without it.
-import ballerinax/amp as _;
-
 configurable int servicePort = 8080;
 
 listener http:Listener backendListener = new (servicePort);

@@ -25,10 +25,6 @@
 
 import ballerina/mcp;
 
-// Enables the WSO2 Agent Manager (AMP) tracing extension. Import only - the
-// platform's auto-instrumentation does nothing for a Ballerina program without it.
-import ballerinax/amp as _;
-
 configurable int servicePort = 9091;
 
 listener mcp:StreamableHttpListener mcpListener = new (servicePort);

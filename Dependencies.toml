@@ -9,15 +9,56 @@ distribution-version = "2201.13.5"
 
 [[package]]
 org = "anupama"
-name = "claimtools"
+name = "amani_claim_agent"
 version = "0.1.0"
 dependencies = [
+	{org = "ballerina", name = "ai"},
 	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "mcp"},
+	{org = "ballerina", name = "time"},
 	{org = "ballerinax", name = "amp"}
 ]
 modules = [
-	{org = "anupama", packageName = "claimtools", moduleName = "claimtools"}
+	{org = "anupama", packageName = "amani_claim_agent", moduleName = "amani_claim_agent"},
+	{org = "anupama", packageName = "amani_claim_agent", moduleName = "amani_claim_agent.claimapi"},
+	{org = "anupama", packageName = "amani_claim_agent", moduleName = "amani_claim_agent.claimtools"}
+]
+
+[[package]]
+org = "ballerina"
+name = "ai"
+version = "1.15.0"
+dependencies = [
+	{org = "ballerina", name = "cache"},
+	{org = "ballerina", name = "constraint"},
+	{org = "ballerina", name = "crypto"},
+	{org = "ballerina", name = "data.jsondata"},
+	{org = "ballerina", name = "data.xmldata"},
+	{org = "ballerina", name = "file"},
+	{org = "ballerina", name = "http"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "jwt"},
+	{org = "ballerina", name = "lang.array"},
+	{org = "ballerina", name = "lang.regexp"},
+	{org = "ballerina", name = "lang.runtime"},
+	{org = "ballerina", name = "lang.string"},
+	{org = "ballerina", name = "log"},
+	{org = "ballerina", name = "math.vector"},
+	{org = "ballerina", name = "mcp"},
+	{org = "ballerina", name = "mime"},
+	{org = "ballerina", name = "observe"},
+	{org = "ballerina", name = "random"},
+	{org = "ballerina", name = "time"},
+	{org = "ballerina", name = "url"},
+	{org = "ballerina", name = "uuid"},
+	{org = "ballerina", name = "yaml"}
+]
+modules = [
+	{org = "ballerina", packageName = "ai", moduleName = "ai"},
+	{org = "ballerina", packageName = "ai", moduleName = "ai.intelligence"},
+	{org = "ballerina", packageName = "ai", moduleName = "ai.observe"}
 ]
 
 [[package]]
@@ -64,6 +105,15 @@ dependencies = [
 org = "ballerina"
 name = "data.jsondata"
 version = "1.1.4"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "lang.object"}
+]
+
+[[package]]
+org = "ballerina"
+name = "data.xmldata"
+version = "1.6.3"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.object"}
@@ -226,6 +276,14 @@ dependencies = [
 	{org = "ballerina", name = "lang.value"},
 	{org = "ballerina", name = "observe"}
 ]
+modules = [
+	{org = "ballerina", packageName = "log", moduleName = "log"}
+]
+
+[[package]]
+org = "ballerina"
+name = "math.vector"
+version = "1.2.0"
 
 [[package]]
 org = "ballerina"
@@ -284,6 +342,15 @@ dependencies = [
 
 [[package]]
 org = "ballerina"
+name = "random"
+version = "1.7.0"
+dependencies = [
+	{org = "ballerina", name = "jballerina.java"},
+	{org = "ballerina", name = "time"}
+]
+
+[[package]]
+org = "ballerina"
 name = "task"
 version = "2.11.2"
 dependencies = [
@@ -298,6 +365,9 @@ name = "time"
 version = "2.8.1"
 dependencies = [
 	{org = "ballerina", name = "jballerina.java"}
+]
+modules = [
+	{org = "ballerina", packageName = "time", moduleName = "time"}
 ]
 
 [[package]]
@@ -317,6 +387,18 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.int"},
 	{org = "ballerina", name = "time"}
+]
+
+[[package]]
+org = "ballerina"
+name = "yaml"
+version = "0.8.0"
+dependencies = [
+	{org = "ballerina", name = "file"},
+	{org = "ballerina", name = "io"},
+	{org = "ballerina", name = "lang.array"},
+	{org = "ballerina", name = "lang.regexp"},
+	{org = "ballerina", name = "log"}
 ]
 
 [[package]]

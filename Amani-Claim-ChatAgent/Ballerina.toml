@@ -1,9 +1,0 @@
-[package]
-org = "anupama"
-name = "Amani_Claim_ChatAgent"
-version = "0.1.0"
-distribution = "2201.13.5"
-title = "Amani-Claim-ChatAgent"
-
-[build-options]
-sticky = true

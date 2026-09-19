@@ -1,3 +1,9 @@
-[workspace]
-title = "Amani-Insurance-Integration-Lab"
-packages = ["claimapi", "claimtools", "Amani-Claim-ChatAgent"]
+[package]
+org = "anupama"
+name = "amani_claim_agent"
+version = "0.1.0"
+distribution = "2201.13.5"
+title = "Amani-Claim-ChatAgent"
+
+[build-options]
+sticky = true

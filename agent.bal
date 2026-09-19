@@ -9,12 +9,21 @@
 // so this agent's own instructions only need to describe the job, not
 // re-implement the rules.
 //
-// Built to be deployed on WSO2 Agent Manager: a single ai:Agent construction
-// with an inline systemPrompt, a concrete ai:Wso2ModelProvider, the MCP
-// toolkit in `tools`, and a standard chat trigger service.
+// Deployed on WSO2 Agent Manager as a SINGLE agent, so all three services run
+// in this one process:
+//
+//   /chat       :8000  (this module)   - the only port the platform exposes
+//   claimtools  :9091  (localhost)     - the MCP toolset this agent calls
+//   claimapi    :8080  (localhost)     - the claims backend claimtools calls
+//
+// The two submodules below are imported for their listeners alone; nothing in
+// this module references their symbols.
 
 import ballerina/ai;
 import ballerina/http;
+
+import amani_claim_agent.claimapi as _;
+import amani_claim_agent.claimtools as _;
 
 // Enables the WSO2 Agent Manager (AMP) tracing extension. Import only - the
 // platform's auto-instrumentation does nothing for a Ballerina program without it.
@@ -28,9 +37,38 @@ configurable int servicePort = 8000;
 
 final ai:Wso2ModelProvider claimChatAgentModel = check ai:getDefaultModelProvider();
 
-final ai:McpToolKit claimChatAgentMcpToolkit = check new (claimsToolsMcpServerUrl);
+// The agent cannot be built at module init. ai:McpToolKit's constructor performs
+// the MCP `initialize` and `tools/list` round-trips immediately, and Ballerina
+// runs every module's init before starting any listener - so at init time the
+// co-located claimtools listener on 9091 is not accepting connections yet and
+// construction would fail, taking the whole process down. Build it on the first
+// request instead, once all listeners are up, and keep it for later turns.
+isolated ai:Agent? agentHolder = ();
 
-final ai:Agent claimChatAgent = check new (
+isolated function getClaimChatAgent() returns ai:Agent|error {
+    lock {
+        ai:Agent? existing = agentHolder;
+        if existing !is () {
+            return existing;
+        }
+    }
+
+    ai:McpToolKit toolkit = check new (claimsToolsMcpServerUrl);
+    ai:Agent created = check buildAgent(toolkit);
+
+    lock {
+        // Two first requests can race here; keep whichever landed first so every
+        // caller shares one agent.
+        ai:Agent? existing = agentHolder;
+        if existing !is () {
+            return existing;
+        }
+        agentHolder = created;
+        return created;
+    }
+}
+
+isolated function buildAgent(ai:McpToolKit toolkit) returns ai:Agent|error => new (
     systemPrompt = {
         role: string `Amani General Insurance Claims Operations Assistant`,
         instructions: string `You help an Amani General Insurance employee (a claims handler or adjuster) carry out claim operations by chatting with you, one turn at a time.
@@ -43,7 +81,7 @@ Only call settleClaim when asked to process payment on an approved claim.
 Always tell the employee plainly what you found, what you did, and why, citing the coverage basis or policy clause when relevant, so they can trust and verify your work.`
     },
     model = claimChatAgentModel,
-    tools = [claimChatAgentMcpToolkit]
+    tools = [toolkit]
 );
 
 listener ai:Listener claimChatAgentListener = new (listenOn = servicePort);
@@ -53,6 +91,7 @@ listener ai:Listener claimChatAgentListener = new (listenOn = servicePort);
 service / on claimChatAgentListener {
 
     resource function post chat(@http:Payload ai:ChatReqMessage request) returns ai:ChatRespMessage|error {
+        ai:Agent claimChatAgent = check getClaimChatAgent();
         string stringResult = check claimChatAgent.run(request.message, request.sessionId);
         return {message: stringResult};
     }
