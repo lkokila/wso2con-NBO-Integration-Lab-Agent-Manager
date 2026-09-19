@@ -1,0 +1,18 @@
+# Repo-wide safety net. Each package also carries its own .gitignore; this
+# catches anything added later that forgets one.
+
+# Build output
+target/
+generated/
+
+# Configuration holding credentials - supplied via Agent Manager env vars
+# at deploy time, never committed. See README.md "Configuration".
+Config.toml
+**/Config.toml
+
+# Development-time tracing
+trace_enabled.bal
+
+# Local editor / OS state
+.vscode/
+.DS_Store
